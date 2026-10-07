@@ -1,0 +1,47 @@
+
+services:
+  wt:
+    extends:
+      file: wt.yml
+      service: wt
+    environment:
+      - SQL_TYPE=MSSQL
+      - SQL_USERNAME=${MSSQL_USERNAME}
+      - SQL_PASSWORD=${MSSQL_SA_PASSWORD}
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+    ports:
+      - ${WT_HOST_PORT}:${WT_DOCKER_PORT}
+
+  db:
+    image: mcr.microsoft.com/mssql/server:latest
+    env_file: .env
+    entrypoint: /tmp/config/entrypoint.sh
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD}
+    volumes:
+      - ./misc/mssql:/tmp/config
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P "$$MSSQL_SA_PASSWORD" -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    ports:
+      - ${MSSQL_HOST_PORT}:${MSSQL_DOCKER_PORT}
+
+  email:
+    image: axllent/mailpit
+    ports:
+      - ${MAILPIT_HOST_SMTP_PORT}:${MAILPIT_DOCKER_SMTP_PORT}
+      - ${MAILPIT_HOST_UI_PORT}:${MAILPIT_DOCKER_UI_PORT}
+
+volumes:
+  wt-data:
+  wt-webtutor:
+  wt-logs:
+  wt-idxs:
+  wt-apps:

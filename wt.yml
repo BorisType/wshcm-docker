@@ -1,0 +1,24 @@
+services:
+  wt:
+    image: ${WT_IMAGE}
+    entrypoint: /tmp/wt/start.sh
+    env_file: .env
+    tty: true
+    environment:
+      - MSSQL_USERNAME=${MSSQL_USERNAME}
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD}
+    volumes:
+      - ./misc/wt/wshcmx:/WebsoftServer/wt/web/wshcmx
+      - ./misc/wt:/tmp/wt
+      - wt-data:/WebsoftServer/wt_data
+      - wt-webtutor:/WebsoftServer/wt/web/webtutor
+      - wt-logs:/WebsoftServer/Logs
+      - wt-idxs:/WebsoftServer/ft-idx
+      - wt-apps:/WebsoftServer/applications
+
+volumes:
+  wt-data:
+  wt-webtutor:
+  wt-logs:
+  wt-idxs:
+  wt-apps:
