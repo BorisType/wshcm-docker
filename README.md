@@ -66,6 +66,28 @@ const ctx = await browser.newContext({
 await page.goto('http://127.0.0.1:8080/home');
 ```
 
+## Кастомизация (overlay)
+
+Свои файлы и замены коробочных кладём в `misc/wt/overlay/` (в контейнере —
+`/tmp/wt/overlay`). `start.sh` при запуске копирует содержимое поверх
+`/WebsoftServer/`, так правки живут в git и переживают пересборку контейнера.
+Hot-reload у WT нет — после изменений: `docker compose -f wt-postgres.yml restart wt`.
+
+Служебные `xHttp.ini`, `spxml_unibridge_config.xml`, `is.js` генерируются
+`start.sh` с подстановкой env, поэтому overlay их перезаписывать не должен:
+при конфликте контейнер не стартует с явной ошибкой в логе.
+Осознанная замена — `OVERLAY_ALLOW_PROTECTED=1` в `.env`.
+
+Пример раскладки:
+
+```
+misc/wt/overlay/wt/web/my_page.html
+misc/wt/overlay/components/<component>/<file>.js
+```
+
+Что overlay не покрывает — объекты в БД (веб-шаблоны, LP-конфиги): они правятся
+через админку/x-shell/SQL, но часто ссылаются на файлы, которые удобно возить overlay'ем.
+
 ## Сервисы и порты (по умолчанию из `.env.example`)
 
 | Сервис    | Образ                  | Наружу       | Внутрь | Назначение                        |
