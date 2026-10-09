@@ -1,5 +1,6 @@
 # runtime / secrets / heavy vendor blobs — local only
 *.tar.gz
 *.tar
+*.zip
 .env
 fifd

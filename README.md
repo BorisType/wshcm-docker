@@ -22,14 +22,49 @@
 docker load -i hcm_2025.1.1333.tar.gz
 cp .env.example .env   # поправь версии/пароли при необходимости
 docker compose -f wt-postgres.yml up -d
-docker logs -f <project>-wt-1   # ждём "Server started"
+docker logs -f <project>-wt-1   # "Server started" — НЕ готовность, см. «Диагностика»
 ```
 
 Первый старт долгий (10–20 мин): WT сам дотягивает схему и накатывает ~160 пакетов.
-Портал отвечает `302` на `/` когда готов.
+Портал отвечает `302` на `/` когда готов. Вход в каталог `hosts` нужен построчно
+на каждый внешний порт, поэтому спереди стоит nginx (см. ниже).
+Дефолтный логин стенда: `user1/user1`.
 
-Вход в каталог `hosts` нужен построчно на каждый внешний порт,
-поэтому спереди стоит nginx (см. ниже). Дефолтный логин стенда: `user1/user1`.
+## Диагностика первого старта
+
+`Server started` в логе — ещё не готовность: после него 10–15 минут идёт накат
+пакетов, и портал не отвечает. Прогресс-бара нет, признаки фазы установки такие:
+
+- `docker logs <project>-wt-1 | grep "Installation proc pack"` — очередь пакетов,
+  набирается в первые минуты после старта;
+- `docker logs <project>-wt-1 | grep "Too long handle statements"` — собственно
+  установка (обработчик `wtv_global_handle_statements_update.js` занят пакетами),
+  повторяется раз в ~1–2 мин; последняя запись ≈ конец установки;
+- веб-запросы в это время либо висят, либо отдают
+  `Current host (wt:80) is not found in the list of WebSoft HCM access allowed hosts` —
+  это нормально: строка `*:80` в `dbo.hosts` создаётся сразу, но кэш узлов
+  собирается только по завершении установки;
+- `docker exec <project>-wt-1 tail -5 /WebsoftServer/Logs/statements_process_*.log`.
+
+Признак готовности — ответ портала, а не строка в логе:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/default   # 200
+```
+
+## Авторизация (для инструментов/агентов)
+
+Вход — HTTP Basic (`portal_auth_type=basic`): `/default` отдаёт только страницу
+с кнопкой «Вход», дальше нативная браузерная диалог-форма, которая не кликается
+автоматизацией. Проверка: `curl -u user1:user1 .../home` → `200`, без креды → `401`.
+Playwright — задать креды в контексте и идти сразу на `/home`:
+
+```js
+const ctx = await browser.newContext({
+  httpCredentials: { username: 'user1', password: 'user1' },
+});
+await page.goto('http://127.0.0.1:8080/home');
+```
 
 ## Сервисы и порты (по умолчанию из `.env.example`)
 
@@ -64,6 +99,8 @@ WT привязывает доступ к паре `host:port` из катало
   дефолтный пул выбирался с `FATAL: sorry, too many clients already`.
 - `extra_hosts: host.docker.internal:host-gateway` (на Linux имя не резолвится само).
 - `+proxy` (nginx): нормализация `Host → wt:80`, `proxy_redirect` наружу.
+- `+WebSocket` в nginx (`Upgrade`/`Connection: upgrade`): без этого
+  `/services/*_ws_service` отдавал 500 и живые уведомления не работали.
 
 ## MSSQL-ветка
 
