@@ -4,3 +4,7 @@
 *.zip
 .env
 fifd
+
+# локальное содержимое overlay не публикуется
+misc/wt/overlay/*
+!misc/wt/overlay/.gitkeep

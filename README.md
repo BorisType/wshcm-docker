@@ -52,6 +52,23 @@ docker logs -f <project>-wt-1   # "Server started" — НЕ готовность
 curl -s -o /dev/null -w "%{http_code}\n" http://127.0.0.1:8080/default   # 200
 ```
 
+## Известные предупреждения (не баги)
+
+- `Warning: Database version (X) may be incompatible` в
+  `/WebsoftServer/Logs/spxml_unibridge_*.log` — печатается на каждом старте в обеих
+  ветках (PG: `1.23.4.21`, MSSQL: `1.8.11.1`). Значения приходят из вендорских
+  `create_db.sql` / `create.sql` (функция `getdbversion`) и не совпадают с версией
+  сборки; на работу не влияет — установка, запись данных и Lucene-индексы проходят
+  штатно. Менять значение без вендорской доки не стоит: оно важно только для
+  утилит `db set type / db create / db init / db migrate`.
+- MSSQL: `spxml_check_db()` возвращает 0 и default fulltext-каталога в БД нет —
+  в Linux-образе SQL Server Full-Text Search не установлен
+  (`SERVERPROPERTY('IsFullTextInstalled') = 0`), поэтому строка
+  `CREATE FULLTEXT CATALOG` в `create.sql` закомментирована. WT использует Lucene
+  (`LuceneFTIndex=true`), SQL-FTS не нужен.
+- PG: `create_db.sql` прописывает `OWNER TO root` — при смене `POSTGRES_USERNAME`
+  init-скрипт упадёт (роль `root` не существует). Оставляй `root` или правь скрипт.
+
 ## Авторизация (для инструментов/агентов)
 
 Вход — HTTP Basic (`portal_auth_type=basic`): `/default` отдаёт только страницу
@@ -70,7 +87,8 @@ await page.goto('http://127.0.0.1:8080/home');
 
 Свои файлы и замены коробочных кладём в `misc/wt/overlay/` (в контейнере —
 `/tmp/wt/overlay`). `start.sh` при запуске копирует содержимое поверх
-`/WebsoftServer/`, так правки живут в git и переживают пересборку контейнера.
+`/WebsoftServer/`, так правки переживают пересборку контейнера.
+Содержимое overlay в git не попадает (см. `.gitignore`) — это локальные файлы.
 Hot-reload у WT нет — после изменений: `docker compose -f wt-postgres.yml restart wt`.
 
 Служебные `xHttp.ini`, `spxml_unibridge_config.xml`, `is.js` генерируются
@@ -126,6 +144,16 @@ WT привязывает доступ к паре `host:port` из катало
 
 ## MSSQL-ветка
 
-`wt-mssql.yml` — как в оригинале (не обкатывалась здесь):
+`wt-mssql.yml` — база как в оригинале плюс фиксы:
 `docker compose -f wt-mssql.yml up -d`, БД `WTDB` создаёт `restore.sh`
-(из `db.bak` либо `create.sql`), `wt` ждёт `healthy`.
+(из `db.bak` в `misc/mssql/` либо из `create.sql`). `wt` ждёт healthcheck `db`:
+маркер `/tmp/db_init_done` появляется только после создания/восстановления БД,
+а не когда sqlservr просто поднялся. Что исправлено относительно оригинала:
+`extra_hosts` для `wt` (ConnectionString и SMTP ходят через `host.docker.internal`),
+том `mssql-data` под `/var/opt/mssql` (данные переживают пересоздание контейнера),
+`restore.sh` коннектится к `localhost`, а не `host.docker.internal` (на Linux имя
+не резолвится и скрипт зависал), лимит попыток подключения и `-b` для честных
+кодов возврата, образ запинен `2022-latest`, добавлен nginx-прокси как в
+PG-ветке (вход через 8080, WT видит `Host: wt:80`). Полный прогон проверен:
+первый старт ~4 мин, вход `user1/user1`, в `dbo.hosts` строка `*:80`.
+Свои дампы кладите в `misc/mssql/db.bak`.
