@@ -1,7 +1,7 @@
 services:
   wt:
     extends:
-      file: wt.yml
+      file: wt.base.yml
       service: wt
     environment:
       - SQL_TYPE=PostgreSQL

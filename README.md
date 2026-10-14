@@ -16,13 +16,27 @@
 
 Отличия от `wshcmx/docker` — см. «Что починили» ниже.
 
+## Структура репозитория
+
+```
+wt.base.yml        # общий фрагмент сервиса wt (образ, тома, start.sh)
+wt-postgres.yml    # ветка PostgreSQL: postgres + wt + proxy + mailpit
+wt-mssql.yml       # ветка MSSQL: db + wt + proxy + mailpit
+misc/wt/           # start.sh, шаблоны xhttp.ini/is.js/..., overlay/
+misc/postgres/     # create_db.sql (инициализация схемы)
+misc/mssql/        # entrypoint.sh, restore.sh, create.sql, drop.sql, db.bak
+misc/proxy/        # nginx.conf
+scripts/smoke.sh   # ожидание готовности портала (200 на /default)
+dist/              # hcm_*.tar.gz и WT_directory*.zip (локально, не в git)
+```
+
 ## Быстрый старт (postgres)
 
 ```bash
-docker load -i hcm_2025.1.1333.tar.gz
+docker load -i dist/hcm_2025.1.1333.tar.gz
 cp .env.example .env   # поправь версии/пароли при необходимости
 docker compose -f wt-postgres.yml up -d
-docker logs -f <project>-wt-1   # "Server started" — НЕ готовность, см. «Диагностика»
+./scripts/smoke.sh     # ждёт готовности и проверяет 200 на /default
 ```
 
 Первый старт долгий (10–20 мин): WT сам дотягивает схему и накатывает ~160 пакетов.

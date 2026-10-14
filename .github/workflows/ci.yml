@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare env
+        run: cp .env.example .env
+
+      - name: Validate compose files
+        run: |
+          docker compose -f wt-postgres.yml config >/dev/null
+          docker compose -f wt-mssql.yml config >/dev/null
+
+      - name: Shell syntax check
+        run: bash -n misc/wt/start.sh misc/mssql/entrypoint.sh misc/mssql/restore.sh scripts/smoke.sh

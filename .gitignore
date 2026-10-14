@@ -2,8 +2,10 @@
 *.tar.gz
 *.tar
 *.zip
+*.bak
 .env
 fifd
+/dist/
 
 # локальное содержимое overlay не публикуется
 misc/wt/overlay/*
